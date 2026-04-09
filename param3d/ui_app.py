@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -68,8 +69,22 @@ class BridgeParametricWindow(QMainWindow):
         self.panel.setObjectName("rightPanel")
 
         panel_layout = QVBoxLayout(self.panel)
-        panel_layout.setContentsMargins(14, 14, 14, 14)
-        panel_layout.setSpacing(10)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(0)
+
+        panel_scroll = QScrollArea(self.panel)
+        panel_scroll.setWidgetResizable(True)
+        panel_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        panel_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        panel_content = QWidget()
+        controls_layout = QVBoxLayout(panel_content)
+
+        panel_scroll.setWidget(panel_content)
+        panel_layout.addWidget(panel_scroll)
+
+        controls_layout.setContentsMargins(14, 14, 14, 14)
+        controls_layout.setSpacing(10)
 
         title = QLabel("PARAMETERS PANEL")
         title.setObjectName("panelTitle")
@@ -301,19 +316,26 @@ class BridgeParametricWindow(QMainWindow):
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("statusLabel")
 
-        panel_layout.addWidget(title)
-        panel_layout.addWidget(self.column_group)
-        panel_layout.addWidget(self.superstructure_group)
-        panel_layout.addWidget(self.slab_group)
-        panel_layout.addWidget(self.foundation_group)
-        panel_layout.addWidget(self.pier_cap_group)
-        panel_layout.addWidget(self.pile_group)
-        panel_layout.addWidget(self.update_button)
-        panel_layout.addWidget(self.status_label)
-        panel_layout.addStretch(1)
+        controls_layout.addWidget(title)
+        controls_layout.addWidget(self.column_group)
+        controls_layout.addWidget(self.superstructure_group)
+        controls_layout.addWidget(self.slab_group)
+        controls_layout.addWidget(self.foundation_group)
+        controls_layout.addWidget(self.pier_cap_group)
+        controls_layout.addWidget(self.pile_group)
+        controls_layout.addWidget(self.update_button)
+        controls_layout.addWidget(self.status_label)
+        controls_layout.addStretch(1)
 
         self.panel.setStyleSheet(
             "#rightPanel { background: #f4f5f7; border: 1px solid #d6d9de; color: #1f2937; }"
+            "#rightPanel QScrollArea { border: none; background: transparent; }"
+            "#rightPanel QScrollArea > QWidget > QWidget { background: transparent; }"
+            "#rightPanel QScrollBar:vertical { width: 10px; background: #e5e7eb; margin: 6px 2px 6px 0; border-radius: 5px; }"
+            "#rightPanel QScrollBar::handle:vertical { background: #9ca3af; min-height: 24px; border-radius: 5px; }"
+            "#rightPanel QScrollBar::handle:vertical:hover { background: #6b7280; }"
+            "#rightPanel QScrollBar::add-line:vertical, #rightPanel QScrollBar::sub-line:vertical { height: 0px; }"
+            "#rightPanel QScrollBar::add-page:vertical, #rightPanel QScrollBar::sub-page:vertical { background: transparent; }"
             "#rightPanel QLabel { color: #1f2937; }"
             "#panelTitle { font-size: 14px; font-weight: 700; color: #111827; }"
             "#rightPanel QGroupBox { color: #111827; font-weight: 600; border: 1px solid #c7ccd3; margin-top: 8px; }"
