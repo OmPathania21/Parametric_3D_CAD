@@ -313,8 +313,15 @@ class BridgeParametricWindow(QMainWindow):
         pile_form.addRow("Pile Spacing Y (mm)", self.pile_spacing_y_input)
 
         self.update_button = QPushButton("Update Model")
+        self.reset_button = QPushButton("Reset")
+        self.reset_button.setObjectName("resetButton")
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("statusLabel")
+
+        button_row = QHBoxLayout()
+        button_row.setSpacing(8)
+        button_row.addWidget(self.update_button, 1)
+        button_row.addWidget(self.reset_button, 1)
 
         controls_layout.addWidget(title)
         controls_layout.addWidget(self.column_group)
@@ -323,7 +330,7 @@ class BridgeParametricWindow(QMainWindow):
         controls_layout.addWidget(self.foundation_group)
         controls_layout.addWidget(self.pier_cap_group)
         controls_layout.addWidget(self.pile_group)
-        controls_layout.addWidget(self.update_button)
+        controls_layout.addLayout(button_row)
         controls_layout.addWidget(self.status_label)
         controls_layout.addStretch(1)
 
@@ -347,6 +354,9 @@ class BridgeParametricWindow(QMainWindow):
             "#rightPanel QPushButton { color: #ffffff; background: #2563eb; border: 1px solid #1d4ed8; padding: 7px 10px; border-radius: 4px; font-weight: 600; }"
             "#rightPanel QPushButton:hover { background: #1d4ed8; }"
             "#rightPanel QPushButton:pressed { background: #1e40af; }"
+            "#resetButton { color: #111827; background: #e5e7eb; border: 1px solid #9ca3af; }"
+            "#resetButton:hover { background: #d1d5db; }"
+            "#resetButton:pressed { background: #9ca3af; }"
             "#statusLabel { color: #334155; font-size: 11px; }"
         )
 
@@ -354,6 +364,7 @@ class BridgeParametricWindow(QMainWindow):
 
     def _connect_events(self) -> None:
         self.update_button.clicked.connect(self._on_update_model_clicked)
+        self.reset_button.clicked.connect(self._on_reset_defaults_clicked)
         self.column_height_input.valueChanged.connect(self._request_auto_update)
         self.column_diameter_input.valueChanged.connect(self._request_auto_update)
         self.span_length_input.valueChanged.connect(self._request_auto_update)
@@ -386,6 +397,52 @@ class BridgeParametricWindow(QMainWindow):
     def _initialize_scene(self) -> None:
         configure_display_scene(self.display)
         self._on_update_model_clicked()
+
+    def _set_inputs_from_params(self, params: Dict[str, Any]) -> None:
+        widget_values = [
+            (self.column_height_input, float(params["column_height"])),
+            (self.column_diameter_input, float(params["column_diameter"])),
+            (self.span_length_input, float(params["span_length_L"])),
+            (self.n_girders_input, int(params["n_girders"])),
+            (self.girder_spacing_input, float(params["girder_spacing"])),
+            (self.girder_depth_input, float(params["girder_depth"])),
+            (self.girder_flange_width_input, float(params["girder_flange_width"])),
+            (self.slab_width_input, float(params["deck_width"])),
+            (self.slab_thickness_input, float(params["deck_thickness"])),
+            (self.rebar_diameter_input, float(params["rebar_diameter"])),
+            (self.deck_cover_input, float(params["deck_cover"])),
+            (self.rebar_spacing_long_input, float(params["deck_spacing_longitudinal"])),
+            (self.rebar_spacing_trans_input, float(params["deck_spacing_transverse"])),
+            (self.pile_cap_length_input, float(params["pile_cap_length"])),
+            (self.pile_cap_width_input, float(params["pile_cap_width"])),
+            (self.pile_cap_depth_input, float(params["pile_cap_depth"])),
+            (self.pier_cap_length_input, float(params["pier_cap_length"])),
+            (self.pier_cap_width_top_input, float(params["pier_cap_width_top"])),
+            (self.pier_cap_width_bottom_input, float(params["pier_cap_width_bottom"])),
+            (self.pier_cap_depth_input, float(params["pier_cap_depth"])),
+            (self.cap_to_deck_gap_input, float(params["cap_to_deck_gap"])),
+            (self.pile_diameter_input, float(params["pile_diameter"])),
+            (self.pile_length_input, float(params["pile_length"])),
+            (self.pile_rows_input, int(params["pile_rows"])),
+            (self.pile_cols_input, int(params["pile_cols"])),
+            (self.pile_spacing_x_input, float(params["pile_spacing_x"])),
+            (self.pile_spacing_y_input, float(params["pile_spacing_y"])),
+        ]
+
+        # Apply defaults in one batch so reset triggers only one model rebuild.
+        for widget, value in widget_values:
+            was_blocked = widget.blockSignals(True)
+            widget.setValue(value)
+            widget.blockSignals(was_blocked)
+
+    def _on_reset_defaults_clicked(self) -> None:
+        self._auto_update_timer.stop()
+        defaults = get_default_params()
+        self.params = defaults
+        self._set_inputs_from_params(defaults)
+        self._on_update_model_clicked()
+        if not self.status_label.text().startswith("Update failed"):
+            self.status_label.setText("Model reset to defaults")
 
     def _collect_params(self) -> Dict[str, Any]:
         return {
