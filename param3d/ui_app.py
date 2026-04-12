@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -65,7 +66,12 @@ class BridgeParametricWindow(QMainWindow):
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(8)
 
-        self.viewer = qtViewer3d(root)
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal, root)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.setHandleWidth(8)
+        main_layout.addWidget(self.main_splitter, 1)
+
+        self.viewer = qtViewer3d(self.main_splitter)
         self.viewer.InitDriver()
         self.display = self.viewer._display
         self.metadata_map = {}
@@ -83,21 +89,41 @@ class BridgeParametricWindow(QMainWindow):
         self.hover_tooltip.setStyleSheet("background-color: #222; color: #fff; padding: 6px; border: 1px solid #555; border-radius: 4px; font-size: 11px;")
         self.hover_tooltip.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.hover_tooltip.hide()
-        
-        self.theme_toggle_button = QPushButton("Dark Mode", self.viewer)
+
+        self.top_toolbar = QWidget(self.viewer)
+        self.top_toolbar.setObjectName("topToolbar")
+        top_toolbar_layout = QHBoxLayout(self.top_toolbar)
+        top_toolbar_layout.setContentsMargins(8, 8, 8, 8)
+        top_toolbar_layout.setSpacing(6)
+
+        self.toolbar_update_button = QPushButton("Update", self.top_toolbar)
+        self.toolbar_update_button.setObjectName("toolbarUpdateButton")
+        self.toolbar_reset_button = QPushButton("Reset", self.top_toolbar)
+        self.toolbar_reset_button.setObjectName("toolbarResetButton")
+        self.toolbar_fit_button = QPushButton("Fit", self.top_toolbar)
+        self.toolbar_fit_button.setObjectName("toolbarFitButton")
+        self.theme_toggle_button = QPushButton("Dark Mode", self.top_toolbar)
         self.theme_toggle_button.setObjectName("themeToggleButton")
-        self.theme_toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.theme_toggle_button.setFixedHeight(30)
-        self.theme_toggle_button.move(12, 12)
-        self.theme_toggle_button.raise_()
+
+        for toolbar_button in (
+            self.toolbar_update_button,
+            self.toolbar_reset_button,
+            self.toolbar_fit_button,
+            self.theme_toggle_button,
+        ):
+            toolbar_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            toolbar_button.setMinimumHeight(28)
+            top_toolbar_layout.addWidget(toolbar_button)
+
+        self._position_top_toolbar()
 
         highlight_style = self.display.Context.HighlightStyle()
         highlight_style.SetDisplayMode(1)  # Shaded
         highlight_style.SetColor(Quantity_Color(Quantity_NOC_CYAN1))
-        main_layout.addWidget(self.viewer, 1)
 
-        self.panel = QWidget(root)
-        self.panel.setFixedWidth(300)
+        self.panel = QWidget(self.main_splitter)
+        self.panel.setMinimumWidth(280)
+        self.panel.setMaximumWidth(520)
         self.panel.setObjectName("rightPanel")
 
         panel_layout = QVBoxLayout(self.panel)
@@ -344,6 +370,13 @@ class BridgeParametricWindow(QMainWindow):
         pile_form.addRow("Pile Spacing X (mm)", self.pile_spacing_x_input)
         pile_form.addRow("Pile Spacing Y (mm)", self.pile_spacing_y_input)
 
+        self._configure_collapsible_group(self.column_group, expanded=True)
+        self._configure_collapsible_group(self.superstructure_group, expanded=True)
+        self._configure_collapsible_group(self.slab_group, expanded=True)
+        self._configure_collapsible_group(self.foundation_group, expanded=True)
+        self._configure_collapsible_group(self.pier_cap_group, expanded=True)
+        self._configure_collapsible_group(self.pile_group, expanded=True)
+
         self.update_button = QPushButton("Update Model")
         self.reset_button = QPushButton("Reset")
         self.reset_button.setObjectName("resetButton")
@@ -379,6 +412,9 @@ class BridgeParametricWindow(QMainWindow):
             "#panelTitle { font-size: 14px; font-weight: 700; color: #111827; }"
             "#rightPanel QGroupBox { color: #111827; font-weight: 600; border: 1px solid #c7ccd3; margin-top: 8px; }"
             "#rightPanel QGroupBox::title { color: #111827; subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
+            "#rightPanel QGroupBox::indicator { width: 12px; height: 12px; border-radius: 6px; }"
+            "#rightPanel QGroupBox::indicator:checked { background: #2563eb; border: 1px solid #1d4ed8; }"
+            "#rightPanel QGroupBox::indicator:unchecked { background: #d1d5db; border: 1px solid #9ca3af; }"
             "#rightPanel QDoubleSpinBox { color: #111827; background: #ffffff; border: 1px solid #9ca3af; padding: 2px 6px; }"
             "#rightPanel QDoubleSpinBox::up-button, #rightPanel QDoubleSpinBox::down-button { width: 16px; }"
             "#rightPanel QSpinBox { color: #111827; background: #ffffff; border: 1px solid #9ca3af; padding: 2px 6px; }"
@@ -405,6 +441,9 @@ class BridgeParametricWindow(QMainWindow):
             "#panelTitle { font-size: 14px; font-weight: 700; color: #f9fafb; }"
             "#rightPanel QGroupBox { color: #f3f4f6; font-weight: 600; border: 1px solid #4b5563; margin-top: 8px; }"
             "#rightPanel QGroupBox::title { color: #f3f4f6; subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
+            "#rightPanel QGroupBox::indicator { width: 12px; height: 12px; border-radius: 6px; }"
+            "#rightPanel QGroupBox::indicator:checked { background: #2563eb; border: 1px solid #1d4ed8; }"
+            "#rightPanel QGroupBox::indicator:unchecked { background: #4b5563; border: 1px solid #6b7280; }"
             "#rightPanel QDoubleSpinBox { color: #f9fafb; background: #1f2937; border: 1px solid #4b5563; padding: 2px 6px; }"
             "#rightPanel QDoubleSpinBox::up-button, #rightPanel QDoubleSpinBox::down-button { width: 16px; }"
             "#rightPanel QSpinBox { color: #f9fafb; background: #1f2937; border: 1px solid #4b5563; padding: 2px 6px; }"
@@ -420,11 +459,18 @@ class BridgeParametricWindow(QMainWindow):
 
         self._apply_theme()
 
-        main_layout.addWidget(self.panel, 0)
+        self.main_splitter.addWidget(self.viewer)
+        self.main_splitter.addWidget(self.panel)
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 0)
+        self.main_splitter.setSizes([1200, 340])
 
     def _connect_events(self) -> None:
         self.update_button.clicked.connect(self._on_update_model_clicked)
         self.reset_button.clicked.connect(self._on_reset_defaults_clicked)
+        self.toolbar_update_button.clicked.connect(self._on_update_model_clicked)
+        self.toolbar_reset_button.clicked.connect(self._on_reset_defaults_clicked)
+        self.toolbar_fit_button.clicked.connect(self._fit_view)
         self.theme_toggle_button.clicked.connect(self._toggle_dark_mode)
         self.column_height_input.valueChanged.connect(self._request_auto_update)
         self.column_diameter_input.valueChanged.connect(self._request_auto_update)
@@ -454,6 +500,49 @@ class BridgeParametricWindow(QMainWindow):
         self.pile_spacing_x_input.valueChanged.connect(self._request_auto_update)
         self.pile_spacing_y_input.valueChanged.connect(self._request_auto_update)
         self._auto_update_timer.timeout.connect(self._on_update_model_clicked)
+
+    def _set_layout_items_visible(self, layout, visible: bool) -> None:
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            widget = item.widget()
+            child_layout = item.layout()
+            if widget is not None:
+                widget.setVisible(visible)
+            elif child_layout is not None:
+                self._set_layout_items_visible(child_layout, visible)
+
+    def _set_group_expanded(self, group: QGroupBox, expanded: bool) -> None:
+        layout = group.layout()
+        if layout is None:
+            return
+
+        self._set_layout_items_visible(layout, expanded)
+        if expanded:
+            group.setMinimumHeight(0)
+            group.setMaximumHeight(16777215)
+        else:
+            collapsed_height = group.fontMetrics().height() + 24
+            group.setMinimumHeight(collapsed_height)
+            group.setMaximumHeight(collapsed_height)
+
+    def _configure_collapsible_group(self, group: QGroupBox, expanded: bool = True) -> None:
+        group.setCheckable(True)
+        group.setChecked(expanded)
+        self._set_group_expanded(group, expanded)
+        group.toggled.connect(lambda checked, target=group: self._set_group_expanded(target, checked))
+
+    def _position_top_toolbar(self) -> None:
+        self.top_toolbar.adjustSize()
+        self.top_toolbar.move(12, 12)
+        self.top_toolbar.raise_()
+
+    def _fit_view(self) -> None:
+        try:
+            self.display.FitAll()
+            self.display.Context.UpdateCurrentViewer()
+            self._position_top_toolbar()
+        except Exception:
+            pass
 
     def _handle_hover(self, event) -> None:
         ais = None
@@ -505,13 +594,37 @@ class BridgeParametricWindow(QMainWindow):
         if self._dark_mode:
             self.panel.setStyleSheet(self._dark_panel_stylesheet)
             self.theme_toggle_button.setText("Light Mode")
-            self.theme_toggle_button.setStyleSheet(
-                "background: rgba(17, 24, 39, 220);"
-                "color: #f9fafb;"
-                "border: 1px solid #6b7280;"
+            self.top_toolbar.setStyleSheet(
+                "#topToolbar {"
+                "background: rgba(15, 23, 42, 220);"
+                "border: 1px solid #475569;"
+                "border-radius: 10px;"
+                "}"
+                "#topToolbar QPushButton {"
+                "background: #1f2937;"
+                "color: #e5e7eb;"
+                "border: 1px solid #475569;"
                 "border-radius: 6px;"
                 "padding: 5px 10px;"
+                "font-size: 11px;"
                 "font-weight: 600;"
+                "}"
+                "#topToolbar QPushButton:hover { background: #334155; }"
+                "#topToolbar QPushButton:pressed { background: #475569; }"
+                "#topToolbar QPushButton#themeToggleButton {"
+                "background: #2563eb;"
+                "border: 1px solid #1d4ed8;"
+                "color: #ffffff;"
+                "}"
+                "#topToolbar QPushButton#themeToggleButton:hover { background: #1d4ed8; }"
+                "#topToolbar QPushButton#themeToggleButton:pressed { background: #1e40af; }"
+            )
+            self.main_splitter.setStyleSheet(
+                "QSplitter::handle {"
+                "background: #0f172a;"
+                "border-left: 1px solid #374151;"
+                "border-right: 1px solid #374151;"
+                "}"
             )
             self.hover_tooltip.setStyleSheet(
                 "background-color: #0f172a;"
@@ -525,13 +638,37 @@ class BridgeParametricWindow(QMainWindow):
         else:
             self.panel.setStyleSheet(self._light_panel_stylesheet)
             self.theme_toggle_button.setText("Dark Mode")
-            self.theme_toggle_button.setStyleSheet(
-                "background: rgba(255, 255, 255, 220);"
-                "color: #111827;"
-                "border: 1px solid #9ca3af;"
+            self.top_toolbar.setStyleSheet(
+                "#topToolbar {"
+                "background: rgba(255, 255, 255, 228);"
+                "border: 1px solid #cbd5e1;"
+                "border-radius: 10px;"
+                "}"
+                "#topToolbar QPushButton {"
+                "background: #ffffff;"
+                "color: #1f2937;"
+                "border: 1px solid #cbd5e1;"
                 "border-radius: 6px;"
                 "padding: 5px 10px;"
+                "font-size: 11px;"
                 "font-weight: 600;"
+                "}"
+                "#topToolbar QPushButton:hover { background: #f1f5f9; }"
+                "#topToolbar QPushButton:pressed { background: #e2e8f0; }"
+                "#topToolbar QPushButton#themeToggleButton {"
+                "background: #2563eb;"
+                "border: 1px solid #1d4ed8;"
+                "color: #ffffff;"
+                "}"
+                "#topToolbar QPushButton#themeToggleButton:hover { background: #1d4ed8; }"
+                "#topToolbar QPushButton#themeToggleButton:pressed { background: #1e40af; }"
+            )
+            self.main_splitter.setStyleSheet(
+                "QSplitter::handle {"
+                "background: #f3f4f6;"
+                "border-left: 1px solid #d1d5db;"
+                "border-right: 1px solid #d1d5db;"
+                "}"
             )
             self.hover_tooltip.setStyleSheet(
                 "background-color: #222;"
@@ -543,7 +680,7 @@ class BridgeParametricWindow(QMainWindow):
             )
             self._set_view_background(0.85, 0.85, 0.85)
 
-        self.theme_toggle_button.raise_()
+        self._position_top_toolbar()
 
     def _toggle_dark_mode(self) -> None:
         self._dark_mode = not self._dark_mode
@@ -648,7 +785,7 @@ class BridgeParametricWindow(QMainWindow):
                 self.display.FitAll()
 
             self.display.Context.UpdateCurrentViewer()
-            self.theme_toggle_button.raise_()
+            self._position_top_toolbar()
             self.status_label.setText("Model updated")
         except Exception as exc:
             self.status_label.setText(f"Update failed: {exc}")
