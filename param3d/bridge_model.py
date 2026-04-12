@@ -931,7 +931,7 @@ def render_bridge_model(
         ais = display_shape(display, concrete_shapes[0], concrete_color, transparency=0.6)
         groups["concrete"].append(ais)
         vol = get_shape_volume(concrete_shapes[0]) / 1e9
-        metadata_map[ais] = f"Concrete Deck\nVolume: {vol:.2f} m³"
+        metadata_map[ais] = f"Concrete Slab\nVolume: {vol:.2f} m³"
 
         params = model.get("params", {})
         pile_rows = int(params.get("pile_rows", PILES["pile_rows"]))
