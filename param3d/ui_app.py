@@ -50,6 +50,8 @@ class BridgeParametricWindow(QMainWindow):
 
         self.params: Dict[str, Any] = get_default_params()
         self._dark_mode = False
+        self._panel_visible = True
+        self._panel_saved_width = 340
         self._auto_update_timer = QTimer(self)
         self._auto_update_timer.setSingleShot(True)
         self._auto_update_timer.setInterval(200)
@@ -102,6 +104,10 @@ class BridgeParametricWindow(QMainWindow):
         self.toolbar_reset_button.setObjectName("toolbarResetButton")
         self.toolbar_fit_button = QPushButton("Fit", self.top_toolbar)
         self.toolbar_fit_button.setObjectName("toolbarFitButton")
+        self.panel_toggle_button = QPushButton("Hide Panel", self.top_toolbar)
+        self.panel_toggle_button.setObjectName("panelToggleButton")
+        self.panel_toggle_button.setCheckable(True)
+        self.panel_toggle_button.setChecked(True)
         self.theme_toggle_button = QPushButton("Dark Mode", self.top_toolbar)
         self.theme_toggle_button.setObjectName("themeToggleButton")
 
@@ -109,6 +115,7 @@ class BridgeParametricWindow(QMainWindow):
             self.toolbar_update_button,
             self.toolbar_reset_button,
             self.toolbar_fit_button,
+            self.panel_toggle_button,
             self.theme_toggle_button,
         ):
             toolbar_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -500,6 +507,7 @@ class BridgeParametricWindow(QMainWindow):
         self.main_splitter.setStretchFactor(0, 1)
         self.main_splitter.setStretchFactor(1, 0)
         self.main_splitter.setSizes([1200, 340])
+        self._panel_saved_width = 340
 
     def _connect_events(self) -> None:
         self.update_button.clicked.connect(self._on_update_model_clicked)
@@ -507,6 +515,7 @@ class BridgeParametricWindow(QMainWindow):
         self.toolbar_update_button.clicked.connect(self._on_update_model_clicked)
         self.toolbar_reset_button.clicked.connect(self._on_reset_defaults_clicked)
         self.toolbar_fit_button.clicked.connect(self._fit_view)
+        self.panel_toggle_button.toggled.connect(self._on_panel_toggle_toggled)
         self.theme_toggle_button.clicked.connect(self._toggle_dark_mode)
         self.camera_top_button.clicked.connect(lambda: self._set_camera_preset("top"))
         self.camera_front_button.clicked.connect(lambda: self._set_camera_preset("front"))
@@ -570,6 +579,44 @@ class BridgeParametricWindow(QMainWindow):
         group.setChecked(expanded)
         self._set_group_expanded(group, expanded)
         group.toggled.connect(lambda checked, target=group: self._set_group_expanded(target, checked))
+
+    def _on_panel_toggle_toggled(self, checked: bool) -> None:
+        self._set_panel_visibility(checked)
+
+    def _set_panel_visibility(self, visible: bool) -> None:
+        if visible == self._panel_visible:
+            return
+
+        if visible:
+            self.panel.setVisible(True)
+            self.main_splitter.setHandleWidth(8)
+
+            splitter_sizes = self.main_splitter.sizes()
+            total_width = max(sum(splitter_sizes), 800)
+            panel_width = max(
+                self.panel.minimumWidth(),
+                min(self.panel.maximumWidth(), int(self._panel_saved_width)),
+            )
+            viewer_width = max(200, total_width - panel_width)
+            self.main_splitter.setSizes([viewer_width, panel_width])
+            self.status_label.setText("Parameters panel expanded")
+        else:
+            splitter_sizes = self.main_splitter.sizes()
+            if len(splitter_sizes) > 1 and splitter_sizes[1] > 0:
+                self._panel_saved_width = splitter_sizes[1]
+
+            self.panel.setVisible(False)
+            self.main_splitter.setHandleWidth(0)
+            self.main_splitter.setSizes([max(200, sum(splitter_sizes)), 0])
+            self.status_label.setText("Parameters panel collapsed (full structure view)")
+
+        self._panel_visible = visible
+        was_blocked = self.panel_toggle_button.blockSignals(True)
+        self.panel_toggle_button.setChecked(visible)
+        self.panel_toggle_button.blockSignals(was_blocked)
+        self.panel_toggle_button.setText("Hide Panel" if visible else "Show Panel")
+        self._position_top_toolbar()
+        self._position_camera_toolbar()
 
     def _position_top_toolbar(self) -> None:
         self.top_toolbar.adjustSize()
@@ -694,6 +741,11 @@ class BridgeParametricWindow(QMainWindow):
                 "}"
                 "#topToolbar QPushButton:hover { background: #334155; }"
                 "#topToolbar QPushButton:pressed { background: #475569; }"
+                "#topToolbar QPushButton#panelToggleButton:checked {"
+                "background: #0369a1;"
+                "border: 1px solid #0284c7;"
+                "color: #ecfeff;"
+                "}"
                 "#topToolbar QPushButton#themeToggleButton {"
                 "background: #2563eb;"
                 "border: 1px solid #1d4ed8;"
@@ -760,6 +812,11 @@ class BridgeParametricWindow(QMainWindow):
                 "}"
                 "#topToolbar QPushButton:hover { background: #f1f5f9; }"
                 "#topToolbar QPushButton:pressed { background: #e2e8f0; }"
+                "#topToolbar QPushButton#panelToggleButton:checked {"
+                "background: #0284c7;"
+                "border: 1px solid #0369a1;"
+                "color: #ffffff;"
+                "}"
                 "#topToolbar QPushButton#themeToggleButton {"
                 "background: #2563eb;"
                 "border: 1px solid #1d4ed8;"
