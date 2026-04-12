@@ -52,6 +52,9 @@ class BridgeParametricWindow(QMainWindow):
         self._dark_mode = False
         self._panel_visible = True
         self._panel_saved_width = 340
+        self._param_history: list[Dict[str, Any]] = []
+        self._param_history_index = -1
+        self._max_param_history = 120
         self._auto_update_timer = QTimer(self)
         self._auto_update_timer.setSingleShot(True)
         self._auto_update_timer.setInterval(200)
@@ -59,6 +62,7 @@ class BridgeParametricWindow(QMainWindow):
         self._build_ui()
         self._connect_events()
         self._initialize_scene()
+        self._initialize_parameter_history()
 
     def _build_ui(self) -> None:
         root = QWidget(self)
@@ -102,6 +106,10 @@ class BridgeParametricWindow(QMainWindow):
         self.toolbar_update_button.setObjectName("toolbarUpdateButton")
         self.toolbar_reset_button = QPushButton("Reset", self.top_toolbar)
         self.toolbar_reset_button.setObjectName("toolbarResetButton")
+        self.toolbar_undo_button = QPushButton("Undo", self.top_toolbar)
+        self.toolbar_undo_button.setObjectName("toolbarUndoButton")
+        self.toolbar_redo_button = QPushButton("Redo", self.top_toolbar)
+        self.toolbar_redo_button.setObjectName("toolbarRedoButton")
         self.toolbar_fit_button = QPushButton("Fit", self.top_toolbar)
         self.toolbar_fit_button.setObjectName("toolbarFitButton")
         self.toolbar_zoom_in_button = QPushButton("Zoom +", self.top_toolbar)
@@ -118,6 +126,8 @@ class BridgeParametricWindow(QMainWindow):
         for toolbar_button in (
             self.toolbar_update_button,
             self.toolbar_reset_button,
+            self.toolbar_undo_button,
+            self.toolbar_redo_button,
             self.toolbar_fit_button,
             self.toolbar_zoom_in_button,
             self.toolbar_zoom_out_button,
@@ -127,6 +137,9 @@ class BridgeParametricWindow(QMainWindow):
             toolbar_button.setCursor(Qt.CursorShape.PointingHandCursor)
             toolbar_button.setMinimumHeight(28)
             top_toolbar_layout.addWidget(toolbar_button)
+
+        self.toolbar_undo_button.setToolTip("Undo last parameter edit")
+        self.toolbar_redo_button.setToolTip("Redo parameter edit")
 
         self.camera_toolbar = QWidget(self.viewer)
         self.camera_toolbar.setObjectName("cameraToolbar")
@@ -520,6 +533,8 @@ class BridgeParametricWindow(QMainWindow):
         self.reset_button.clicked.connect(self._on_reset_defaults_clicked)
         self.toolbar_update_button.clicked.connect(self._on_update_model_clicked)
         self.toolbar_reset_button.clicked.connect(self._on_reset_defaults_clicked)
+        self.toolbar_undo_button.clicked.connect(self._undo_parameter_change)
+        self.toolbar_redo_button.clicked.connect(self._redo_parameter_change)
         self.toolbar_fit_button.clicked.connect(self._fit_view)
         self.toolbar_zoom_in_button.clicked.connect(self._zoom_in_view)
         self.toolbar_zoom_out_button.clicked.connect(self._zoom_out_view)
@@ -557,6 +572,67 @@ class BridgeParametricWindow(QMainWindow):
         self.pile_spacing_x_input.valueChanged.connect(self._request_auto_update)
         self.pile_spacing_y_input.valueChanged.connect(self._request_auto_update)
         self._auto_update_timer.timeout.connect(self._on_update_model_clicked)
+
+    def _initialize_parameter_history(self) -> None:
+        self._param_history = []
+        self._param_history_index = -1
+        self._capture_parameter_history(force=True)
+
+    def _capture_parameter_history(self, force: bool = False) -> None:
+        current_state = self._collect_params()
+
+        if 0 <= self._param_history_index < len(self._param_history):
+            if not force and current_state == self._param_history[self._param_history_index]:
+                self._update_history_controls()
+                return
+
+        if self._param_history_index < len(self._param_history) - 1:
+            # Drop redo branch after a fresh edit.
+            self._param_history = self._param_history[: self._param_history_index + 1]
+
+        self._param_history.append(dict(current_state))
+        if len(self._param_history) > self._max_param_history:
+            overflow = len(self._param_history) - self._max_param_history
+            self._param_history = self._param_history[overflow:]
+
+        self._param_history_index = len(self._param_history) - 1
+        self._update_history_controls()
+
+    def _update_history_controls(self) -> None:
+        can_undo = self._param_history_index > 0
+        can_redo = 0 <= self._param_history_index < (len(self._param_history) - 1)
+        self.toolbar_undo_button.setEnabled(can_undo)
+        self.toolbar_redo_button.setEnabled(can_redo)
+
+    def _restore_parameter_state(self, status_message: str) -> None:
+        if not (0 <= self._param_history_index < len(self._param_history)):
+            self._update_history_controls()
+            return
+
+        self._auto_update_timer.stop()
+        target_state = dict(self._param_history[self._param_history_index])
+        self.params = target_state
+        self._set_inputs_from_params(target_state)
+        self._on_update_model_clicked()
+        if not self.status_label.text().startswith("Update failed"):
+            self.status_label.setText(status_message)
+        self._update_history_controls()
+
+    def _undo_parameter_change(self) -> None:
+        if self._param_history_index <= 0:
+            self._update_history_controls()
+            return
+
+        self._param_history_index -= 1
+        self._restore_parameter_state("Undo applied")
+
+    def _redo_parameter_change(self) -> None:
+        if self._param_history_index >= len(self._param_history) - 1:
+            self._update_history_controls()
+            return
+
+        self._param_history_index += 1
+        self._restore_parameter_state("Redo applied")
 
     def _set_layout_items_visible(self, layout, visible: bool) -> None:
         for index in range(layout.count()):
@@ -945,6 +1021,7 @@ class BridgeParametricWindow(QMainWindow):
         self.params = defaults
         self._set_inputs_from_params(defaults)
         self._on_update_model_clicked()
+        self._capture_parameter_history()
         if not self.status_label.text().startswith("Update failed"):
             self.status_label.setText("Model reset to defaults")
 
@@ -1003,6 +1080,7 @@ class BridgeParametricWindow(QMainWindow):
             self.status_label.setText(f"Update failed: {exc}")
 
     def _request_auto_update(self) -> None:
+        self._capture_parameter_history()
         self._auto_update_timer.start()
 
 
