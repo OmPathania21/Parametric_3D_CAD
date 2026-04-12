@@ -115,7 +115,43 @@ class BridgeParametricWindow(QMainWindow):
             toolbar_button.setMinimumHeight(28)
             top_toolbar_layout.addWidget(toolbar_button)
 
+        self.camera_toolbar = QWidget(self.viewer)
+        self.camera_toolbar.setObjectName("cameraToolbar")
+        camera_toolbar_layout = QHBoxLayout(self.camera_toolbar)
+        camera_toolbar_layout.setContentsMargins(8, 8, 8, 8)
+        camera_toolbar_layout.setSpacing(6)
+
+        self.camera_top_button = QPushButton("Top", self.camera_toolbar)
+        self.camera_front_button = QPushButton("Front", self.camera_toolbar)
+        self.camera_side_button = QPushButton("Side", self.camera_toolbar)
+        self.camera_iso_button = QPushButton("Iso", self.camera_toolbar)
+
+        self._camera_buttons = (
+            self.camera_top_button,
+            self.camera_front_button,
+            self.camera_side_button,
+            self.camera_iso_button,
+        )
+
+        for camera_button in self._camera_buttons:
+            camera_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            camera_button.setCheckable(True)
+            camera_button.setMinimumHeight(28)
+            camera_toolbar_layout.addWidget(camera_button)
+
+        self.camera_iso_button.setChecked(True)
+
         self._position_top_toolbar()
+        self._position_camera_toolbar()
+
+        self._orig_viewer_resize_event = self.viewer.resizeEvent
+
+        def _on_viewer_resize(event):
+            self._orig_viewer_resize_event(event)
+            self._position_top_toolbar()
+            self._position_camera_toolbar()
+
+        self.viewer.resizeEvent = _on_viewer_resize
 
         highlight_style = self.display.Context.HighlightStyle()
         highlight_style.SetDisplayMode(1)  # Shaded
@@ -472,6 +508,10 @@ class BridgeParametricWindow(QMainWindow):
         self.toolbar_reset_button.clicked.connect(self._on_reset_defaults_clicked)
         self.toolbar_fit_button.clicked.connect(self._fit_view)
         self.theme_toggle_button.clicked.connect(self._toggle_dark_mode)
+        self.camera_top_button.clicked.connect(lambda: self._set_camera_preset("top"))
+        self.camera_front_button.clicked.connect(lambda: self._set_camera_preset("front"))
+        self.camera_side_button.clicked.connect(lambda: self._set_camera_preset("side"))
+        self.camera_iso_button.clicked.connect(lambda: self._set_camera_preset("iso"))
         self.column_height_input.valueChanged.connect(self._request_auto_update)
         self.column_diameter_input.valueChanged.connect(self._request_auto_update)
         self.span_length_input.valueChanged.connect(self._request_auto_update)
@@ -536,11 +576,54 @@ class BridgeParametricWindow(QMainWindow):
         self.top_toolbar.move(12, 12)
         self.top_toolbar.raise_()
 
+    def _position_camera_toolbar(self) -> None:
+        self.camera_toolbar.adjustSize()
+        bottom_margin = 12
+        y_pos = max(12, self.viewer.height() - self.camera_toolbar.height() - bottom_margin)
+        self.camera_toolbar.move(12, y_pos)
+        self.camera_toolbar.raise_()
+
+    def _set_active_camera_chip(self, preset: str) -> None:
+        preset_map = {
+            "top": self.camera_top_button,
+            "front": self.camera_front_button,
+            "side": self.camera_side_button,
+            "iso": self.camera_iso_button,
+        }
+        active_button = preset_map.get(preset)
+        for button in self._camera_buttons:
+            button.setChecked(button is active_button)
+
+    def _set_camera_preset(self, preset: str) -> None:
+        try:
+            if preset == "top" and hasattr(self.display, "View_Top"):
+                self.display.View_Top()
+            elif preset == "front" and hasattr(self.display, "View_Front"):
+                self.display.View_Front()
+            elif preset == "side":
+                if hasattr(self.display, "View_Right"):
+                    self.display.View_Right()
+                elif hasattr(self.display, "View_Left"):
+                    self.display.View_Left()
+            elif preset == "iso" and hasattr(self.display, "View_Iso"):
+                self.display.View_Iso()
+
+            if hasattr(self.display, "FitAll"):
+                self.display.FitAll()
+            self.display.Context.UpdateCurrentViewer()
+        except Exception:
+            pass
+
+        self._set_active_camera_chip(preset)
+        self._position_top_toolbar()
+        self._position_camera_toolbar()
+
     def _fit_view(self) -> None:
         try:
             self.display.FitAll()
             self.display.Context.UpdateCurrentViewer()
             self._position_top_toolbar()
+            self._position_camera_toolbar()
         except Exception:
             pass
 
@@ -619,6 +702,28 @@ class BridgeParametricWindow(QMainWindow):
                 "#topToolbar QPushButton#themeToggleButton:hover { background: #1d4ed8; }"
                 "#topToolbar QPushButton#themeToggleButton:pressed { background: #1e40af; }"
             )
+            self.camera_toolbar.setStyleSheet(
+                "#cameraToolbar {"
+                "background: rgba(15, 23, 42, 220);"
+                "border: 1px solid #475569;"
+                "border-radius: 10px;"
+                "}"
+                "#cameraToolbar QPushButton {"
+                "background: #1f2937;"
+                "color: #e5e7eb;"
+                "border: 1px solid #475569;"
+                "border-radius: 14px;"
+                "padding: 5px 11px;"
+                "font-size: 11px;"
+                "font-weight: 600;"
+                "}"
+                "#cameraToolbar QPushButton:hover { background: #334155; }"
+                "#cameraToolbar QPushButton:checked {"
+                "background: #0ea5e9;"
+                "border: 1px solid #0284c7;"
+                "color: #ecfeff;"
+                "}"
+            )
             self.main_splitter.setStyleSheet(
                 "QSplitter::handle {"
                 "background: #0f172a;"
@@ -663,6 +768,28 @@ class BridgeParametricWindow(QMainWindow):
                 "#topToolbar QPushButton#themeToggleButton:hover { background: #1d4ed8; }"
                 "#topToolbar QPushButton#themeToggleButton:pressed { background: #1e40af; }"
             )
+            self.camera_toolbar.setStyleSheet(
+                "#cameraToolbar {"
+                "background: rgba(255, 255, 255, 228);"
+                "border: 1px solid #cbd5e1;"
+                "border-radius: 10px;"
+                "}"
+                "#cameraToolbar QPushButton {"
+                "background: #ffffff;"
+                "color: #1f2937;"
+                "border: 1px solid #cbd5e1;"
+                "border-radius: 14px;"
+                "padding: 5px 11px;"
+                "font-size: 11px;"
+                "font-weight: 600;"
+                "}"
+                "#cameraToolbar QPushButton:hover { background: #f1f5f9; }"
+                "#cameraToolbar QPushButton:checked {"
+                "background: #0284c7;"
+                "border: 1px solid #0369a1;"
+                "color: #ffffff;"
+                "}"
+            )
             self.main_splitter.setStyleSheet(
                 "QSplitter::handle {"
                 "background: #f3f4f6;"
@@ -681,6 +808,7 @@ class BridgeParametricWindow(QMainWindow):
             self._set_view_background(0.85, 0.85, 0.85)
 
         self._position_top_toolbar()
+        self._position_camera_toolbar()
 
     def _toggle_dark_mode(self) -> None:
         self._dark_mode = not self._dark_mode
@@ -786,6 +914,7 @@ class BridgeParametricWindow(QMainWindow):
 
             self.display.Context.UpdateCurrentViewer()
             self._position_top_toolbar()
+            self._position_camera_toolbar()
             self.status_label.setText("Model updated")
         except Exception as exc:
             self.status_label.setText(f"Update failed: {exc}")
