@@ -35,6 +35,8 @@ from OCC.Core.STEPControl import STEPControl_AsIs, STEPControl_Writer
 from OCC.Core.TopoDS import TopoDS_Compound, TopoDS_Shape
 from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec
 from OCC.Display.SimpleGui import init_display
+from OCC.Core.GProp import GProp_GProps
+from OCC.Core.BRepGProp import brepgprop_VolumeProperties
 
 
 def _load_external_function(module_basename: str, function_name: str):
@@ -899,53 +901,73 @@ def configure_display_scene(display: Any) -> None:
             pass
 
 
+def get_shape_volume(shape: TopoDS_Shape) -> float:
+    props = GProp_GProps()
+    brepgprop_VolumeProperties(shape, props)
+    return props.Mass()
+
+
 def render_bridge_model(
     display: Any,
     model: Dict[str, Any],
     show_rebar: bool | None = None,
     fit_all: bool = True,
-) -> Dict[str, List[AIS_Shape]]:
+) -> Tuple[Dict[str, List[AIS_Shape]], Dict[Any, str]]:
     steel_color = Quantity_Color(0.3, 0.3, 0.35, Quantity_TOC_RGB)
     concrete_color = Quantity_Color(0.75, 0.75, 0.75, Quantity_TOC_RGB)
     rebar_color = Quantity_Color(0.8, 0.1, 0.1, Quantity_TOC_RGB)
 
     groups: Dict[str, List[AIS_Shape]] = {"steel": [], "concrete": [], "rebar": []}
+    metadata_map: Dict[Any, str] = {}
 
     for shape in model["steel"]:
-        groups["steel"].append(display_shape(display, shape, steel_color))
+        ais = display_shape(display, shape, steel_color)
+        groups["steel"].append(ais)
+        vol = get_shape_volume(shape) / 1e9  # mm³ to m³
+        metadata_map[ais] = f"Steel Component\nVolume: {vol:.2f} m³"
 
     concrete_shapes = list(model["concrete"])
     if concrete_shapes:
-        groups["concrete"].append(
-            display_shape(display, concrete_shapes[0], concrete_color, transparency=0.6)
-        )
+        ais = display_shape(display, concrete_shapes[0], concrete_color, transparency=0.6)
+        groups["concrete"].append(ais)
+        vol = get_shape_volume(concrete_shapes[0]) / 1e9
+        metadata_map[ais] = f"Concrete Deck\nVolume: {vol:.2f} m³"
+        
         for shape in concrete_shapes[1:]:
-            groups["concrete"].append(
-                display_shape(display, shape, concrete_color, transparency=0.5)
-            )
+            ais_sub = display_shape(display, shape, concrete_color, transparency=0.5)
+            groups["concrete"].append(ais_sub)
+            vol_sub = get_shape_volume(shape) / 1e9
+            metadata_map[ais_sub] = f"Concrete Substructure\nVolume: {vol_sub:.2f} m³"
 
     is_rebar_visible = bool(VISUALIZATION.get("show_rebar", True)) if show_rebar is None else bool(show_rebar)
     if is_rebar_visible:
         for shape in model["rebar"]:
-            groups["rebar"].append(display_shape(display, shape, rebar_color, transparency=0.0))
+            ais = display_shape(display, shape, rebar_color, transparency=0.0)
+            groups["rebar"].append(ais)
+            # Pre-compute simple info
+            # Vol is small for rebar, maybe dm^3 
+            vol = get_shape_volume(shape) / 1e6 # mm³ to dm³ (Liters)
+            metadata_map[ais] = f"Rebar\nVolume: {vol:.3f} L"
     else:
         for shape in model["rebar"]:
             ais = AIS_Shape(shape)
             ais.SetColor(rebar_color)
             groups["rebar"].append(ais)
+            vol = get_shape_volume(shape) / 1e6
+            metadata_map[ais] = f"Rebar\nVolume: {vol:.3f} L"
 
     if fit_all:
         display.FitAll()
 
-    return groups
+    return groups, metadata_map
 
 
 def visualize_bridge(model: Dict[str, Any], screenshot_path: str = "") -> None:
     display, start_display, add_menu, add_function_to_menu = init_display()
     configure_display_scene(display)
     rebar_visible = bool(VISUALIZATION.get("show_rebar", True))
-    rendered = render_bridge_model(display, model, show_rebar=rebar_visible, fit_all=True)
-    rebar_ais = rendered["rebar"]
+    rendered_groups, _ = render_bridge_model(display, model, show_rebar=rebar_visible, fit_all=True)
+    rebar_ais = rendered_groups["rebar"]
 
     def toggle_rebar() -> None:
         nonlocal rebar_visible

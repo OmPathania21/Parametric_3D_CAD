@@ -1,4 +1,7 @@
 import sys
+import warnings
+warnings.simplefilter("ignore", DeprecationWarning)
+
 from typing import Any, Dict
 
 from PySide6.QtCore import Qt, QTimer
@@ -15,6 +18,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QToolTip,
 )
 
 from OCC.Display.backend import load_backend
@@ -26,6 +30,7 @@ except Exception:
     pass
 
 from OCC.Display.qtDisplay import qtViewer3d
+from OCC.Core.Quantity import Quantity_Color, Quantity_NOC_CYAN1
 
 from bridge_model import (
     build_bridge,
@@ -62,6 +67,25 @@ class BridgeParametricWindow(QMainWindow):
         self.viewer = qtViewer3d(root)
         self.viewer.InitDriver()
         self.display = self.viewer._display
+        self.metadata_map = {}
+        
+        self._orig_mouseMoveEvent = self.viewer.mouseMoveEvent
+        
+        def _on_mouse_move(event):
+            self._orig_mouseMoveEvent(event)
+            self._handle_hover(event)
+            
+        self.viewer.mouseMoveEvent = _on_mouse_move
+        
+        # High-performance hovering tooltip 
+        self.hover_tooltip = QLabel(self.viewer)
+        self.hover_tooltip.setStyleSheet("background-color: #222; color: #fff; padding: 6px; border: 1px solid #555; border-radius: 4px; font-size: 11px;")
+        self.hover_tooltip.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.hover_tooltip.hide()
+        
+        highlight_style = self.display.Context.HighlightStyle()
+        highlight_style.SetDisplayMode(1)  # Shaded
+        highlight_style.SetColor(Quantity_Color(Quantity_NOC_CYAN1))
         main_layout.addWidget(self.viewer, 1)
 
         self.panel = QWidget(root)
@@ -394,6 +418,38 @@ class BridgeParametricWindow(QMainWindow):
         self.pile_spacing_y_input.valueChanged.connect(self._request_auto_update)
         self._auto_update_timer.timeout.connect(self._on_update_model_clicked)
 
+    def _handle_hover(self, event) -> None:
+        ais = None
+        if self.display.Context.HasDetected():
+            ais = self.display.Context.DetectedInteractive()
+
+        if ais is not None:
+            details = self.metadata_map.get(ais)
+            if details:
+                # Fast floating QLabel update
+                self.hover_tooltip.setText(details)
+                self.hover_tooltip.adjustSize()
+                
+                # Use local pos for widget overlaying mapping
+                pos = event.pos() if hasattr(event, "pos") else event.position().toPoint()
+                self.hover_tooltip.move(pos.x() + 15, pos.y() + 15)
+                self.hover_tooltip.show()
+                self.hover_tooltip.raise_()
+                
+                if ais != getattr(self, "_last_hovered_ais", None):
+                    self.status_label.setText(f"Hovering: {details.splitlines()[0]}")
+                    self._last_hovered_ais = ais
+            else:
+                self.hover_tooltip.hide()
+                if getattr(self, "_last_hovered_ais", None) is not None:
+                    self.status_label.setText("Ready")
+                    self._last_hovered_ais = None
+        else:
+            self.hover_tooltip.hide()
+            if getattr(self, "_last_hovered_ais", None) is not None:
+                self.status_label.setText("Ready")
+                self._last_hovered_ais = None
+
     def _initialize_scene(self) -> None:
         configure_display_scene(self.display)
         self._on_update_model_clicked()
@@ -486,7 +542,7 @@ class BridgeParametricWindow(QMainWindow):
 
             model = get_last_bridge_model()
             if model is not None:
-                render_bridge_model(self.display, model, show_rebar=True, fit_all=True)
+                _, self.metadata_map = render_bridge_model(self.display, model, show_rebar=True, fit_all=True)
             else:
                 self.display.DisplayShape(shape, update=True)
                 self.display.FitAll()
@@ -503,7 +559,6 @@ class BridgeParametricWindow(QMainWindow):
 def main() -> None:
     app = QApplication.instance() or QApplication(sys.argv)
     window = BridgeParametricWindow()
-    window.show()
     window.showMaximized()
     sys.exit(app.exec())
 
