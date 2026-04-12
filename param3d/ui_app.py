@@ -104,6 +104,10 @@ class BridgeParametricWindow(QMainWindow):
         self.toolbar_reset_button.setObjectName("toolbarResetButton")
         self.toolbar_fit_button = QPushButton("Fit", self.top_toolbar)
         self.toolbar_fit_button.setObjectName("toolbarFitButton")
+        self.toolbar_zoom_in_button = QPushButton("Zoom +", self.top_toolbar)
+        self.toolbar_zoom_in_button.setObjectName("toolbarZoomInButton")
+        self.toolbar_zoom_out_button = QPushButton("Zoom -", self.top_toolbar)
+        self.toolbar_zoom_out_button.setObjectName("toolbarZoomOutButton")
         self.panel_toggle_button = QPushButton("Hide Panel", self.top_toolbar)
         self.panel_toggle_button.setObjectName("panelToggleButton")
         self.panel_toggle_button.setCheckable(True)
@@ -115,6 +119,8 @@ class BridgeParametricWindow(QMainWindow):
             self.toolbar_update_button,
             self.toolbar_reset_button,
             self.toolbar_fit_button,
+            self.toolbar_zoom_in_button,
+            self.toolbar_zoom_out_button,
             self.panel_toggle_button,
             self.theme_toggle_button,
         ):
@@ -515,6 +521,8 @@ class BridgeParametricWindow(QMainWindow):
         self.toolbar_update_button.clicked.connect(self._on_update_model_clicked)
         self.toolbar_reset_button.clicked.connect(self._on_reset_defaults_clicked)
         self.toolbar_fit_button.clicked.connect(self._fit_view)
+        self.toolbar_zoom_in_button.clicked.connect(self._zoom_in_view)
+        self.toolbar_zoom_out_button.clicked.connect(self._zoom_out_view)
         self.panel_toggle_button.toggled.connect(self._on_panel_toggle_toggled)
         self.theme_toggle_button.clicked.connect(self._toggle_dark_mode)
         self.camera_top_button.clicked.connect(lambda: self._set_camera_preset("top"))
@@ -668,6 +676,24 @@ class BridgeParametricWindow(QMainWindow):
     def _fit_view(self) -> None:
         try:
             self.display.FitAll()
+            self.display.Context.UpdateCurrentViewer()
+            self._position_top_toolbar()
+            self._position_camera_toolbar()
+        except Exception:
+            pass
+
+    def _zoom_in_view(self) -> None:
+        try:
+            self.display.ZoomFactor(1.20)
+            self.display.Context.UpdateCurrentViewer()
+            self._position_top_toolbar()
+            self._position_camera_toolbar()
+        except Exception:
+            pass
+
+    def _zoom_out_view(self) -> None:
+        try:
+            self.display.ZoomFactor(1.0 / 1.20)
             self.display.Context.UpdateCurrentViewer()
             self._position_top_toolbar()
             self._position_camera_toolbar()
