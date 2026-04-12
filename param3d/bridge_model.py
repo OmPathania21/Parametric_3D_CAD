@@ -950,7 +950,7 @@ def render_bridge_model(
             elif index_in_support == 1:
                 concrete_label = "Pier Structure"
             elif index_in_support == 2:
-                concrete_label = "Pile Cap Structure"
+                concrete_label = "Foundation Structure"
             else:
                 concrete_label = "Pile Structure"
 
