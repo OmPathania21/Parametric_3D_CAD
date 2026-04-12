@@ -932,12 +932,29 @@ def render_bridge_model(
         groups["concrete"].append(ais)
         vol = get_shape_volume(concrete_shapes[0]) / 1e9
         metadata_map[ais] = f"Concrete Deck\nVolume: {vol:.2f} m³"
-        
-        for shape in concrete_shapes[1:]:
+
+        params = model.get("params", {})
+        pile_rows = int(params.get("pile_rows", PILES["pile_rows"]))
+        pile_cols = int(params.get("pile_cols", PILES["pile_cols"]))
+        pile_count_per_support = max(1, pile_rows * pile_cols)
+        shapes_per_support = 3 + pile_count_per_support
+
+        for idx, shape in enumerate(concrete_shapes[1:]):
             ais_sub = display_shape(display, shape, concrete_color, transparency=0.5)
             groups["concrete"].append(ais_sub)
             vol_sub = get_shape_volume(shape) / 1e9
-            metadata_map[ais_sub] = f"Concrete Substructure\nVolume: {vol_sub:.2f} m³"
+
+            index_in_support = idx % shapes_per_support
+            if index_in_support == 0:
+                concrete_label = "Pier Cap Structure"
+            elif index_in_support == 1:
+                concrete_label = "Pier Structure"
+            elif index_in_support == 2:
+                concrete_label = "Pile Cap Structure"
+            else:
+                concrete_label = "Pile Structure"
+
+            metadata_map[ais_sub] = f"{concrete_label}\nVolume: {vol_sub:.2f} m³"
 
     is_rebar_visible = bool(VISUALIZATION.get("show_rebar", True)) if show_rebar is None else bool(show_rebar)
     if is_rebar_visible:
