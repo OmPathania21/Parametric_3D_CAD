@@ -504,6 +504,7 @@ def main() -> None:
     app = QApplication.instance() or QApplication(sys.argv)
     window = BridgeParametricWindow()
     window.show()
+    window.showMaximized()
     sys.exit(app.exec())
 
 
