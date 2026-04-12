@@ -924,7 +924,7 @@ def render_bridge_model(
         ais = display_shape(display, shape, steel_color)
         groups["steel"].append(ais)
         vol = get_shape_volume(shape) / 1e9  # mm³ to m³
-        metadata_map[ais] = f"Steel Component\nVolume: {vol:.2f} m³"
+        metadata_map[ais] = f"Girder Component\nVolume: {vol:.2f} m³"
 
     concrete_shapes = list(model["concrete"])
     if concrete_shapes:
