@@ -30,7 +30,7 @@ except Exception:
     pass
 
 from OCC.Display.qtDisplay import qtViewer3d
-from OCC.Core.Quantity import Quantity_Color, Quantity_NOC_CYAN1
+from OCC.Core.Quantity import Quantity_Color, Quantity_NOC_CYAN1, Quantity_TOC_RGB
 
 from bridge_model import (
     build_bridge,
@@ -48,6 +48,7 @@ class BridgeParametricWindow(QMainWindow):
         self.resize(1520, 880)
 
         self.params: Dict[str, Any] = get_default_params()
+        self._dark_mode = False
         self._auto_update_timer = QTimer(self)
         self._auto_update_timer.setSingleShot(True)
         self._auto_update_timer.setInterval(200)
@@ -83,6 +84,13 @@ class BridgeParametricWindow(QMainWindow):
         self.hover_tooltip.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.hover_tooltip.hide()
         
+        self.theme_toggle_button = QPushButton("Dark Mode", self.viewer)
+        self.theme_toggle_button.setObjectName("themeToggleButton")
+        self.theme_toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.theme_toggle_button.setFixedHeight(30)
+        self.theme_toggle_button.move(12, 12)
+        self.theme_toggle_button.raise_()
+
         highlight_style = self.display.Context.HighlightStyle()
         highlight_style.SetDisplayMode(1)  # Shaded
         highlight_style.SetColor(Quantity_Color(Quantity_NOC_CYAN1))
@@ -358,7 +366,7 @@ class BridgeParametricWindow(QMainWindow):
         controls_layout.addWidget(self.status_label)
         controls_layout.addStretch(1)
 
-        self.panel.setStyleSheet(
+        self._light_panel_stylesheet = (
             "#rightPanel { background: #f4f5f7; border: 1px solid #d6d9de; color: #1f2937; }"
             "#rightPanel QScrollArea { border: none; background: transparent; }"
             "#rightPanel QScrollArea > QWidget > QWidget { background: transparent; }"
@@ -384,11 +392,40 @@ class BridgeParametricWindow(QMainWindow):
             "#statusLabel { color: #334155; font-size: 11px; }"
         )
 
+        self._dark_panel_stylesheet = (
+            "#rightPanel { background: #111827; border: 1px solid #374151; color: #e5e7eb; }"
+            "#rightPanel QScrollArea { border: none; background: transparent; }"
+            "#rightPanel QScrollArea > QWidget > QWidget { background: transparent; }"
+            "#rightPanel QScrollBar:vertical { width: 10px; background: #1f2937; margin: 6px 2px 6px 0; border-radius: 5px; }"
+            "#rightPanel QScrollBar::handle:vertical { background: #4b5563; min-height: 24px; border-radius: 5px; }"
+            "#rightPanel QScrollBar::handle:vertical:hover { background: #6b7280; }"
+            "#rightPanel QScrollBar::add-line:vertical, #rightPanel QScrollBar::sub-line:vertical { height: 0px; }"
+            "#rightPanel QScrollBar::add-page:vertical, #rightPanel QScrollBar::sub-page:vertical { background: transparent; }"
+            "#rightPanel QLabel { color: #e5e7eb; }"
+            "#panelTitle { font-size: 14px; font-weight: 700; color: #f9fafb; }"
+            "#rightPanel QGroupBox { color: #f3f4f6; font-weight: 600; border: 1px solid #4b5563; margin-top: 8px; }"
+            "#rightPanel QGroupBox::title { color: #f3f4f6; subcontrol-origin: margin; left: 8px; padding: 0 4px; }"
+            "#rightPanel QDoubleSpinBox { color: #f9fafb; background: #1f2937; border: 1px solid #4b5563; padding: 2px 6px; }"
+            "#rightPanel QDoubleSpinBox::up-button, #rightPanel QDoubleSpinBox::down-button { width: 16px; }"
+            "#rightPanel QSpinBox { color: #f9fafb; background: #1f2937; border: 1px solid #4b5563; padding: 2px 6px; }"
+            "#rightPanel QSpinBox::up-button, #rightPanel QSpinBox::down-button { width: 16px; }"
+            "#rightPanel QPushButton { color: #ffffff; background: #2563eb; border: 1px solid #1d4ed8; padding: 7px 10px; border-radius: 4px; font-weight: 600; }"
+            "#rightPanel QPushButton:hover { background: #1d4ed8; }"
+            "#rightPanel QPushButton:pressed { background: #1e40af; }"
+            "#resetButton { color: #f3f4f6; background: #374151; border: 1px solid #6b7280; }"
+            "#resetButton:hover { background: #4b5563; }"
+            "#resetButton:pressed { background: #6b7280; }"
+            "#statusLabel { color: #cbd5e1; font-size: 11px; }"
+        )
+
+        self._apply_theme()
+
         main_layout.addWidget(self.panel, 0)
 
     def _connect_events(self) -> None:
         self.update_button.clicked.connect(self._on_update_model_clicked)
         self.reset_button.clicked.connect(self._on_reset_defaults_clicked)
+        self.theme_toggle_button.clicked.connect(self._toggle_dark_mode)
         self.column_height_input.valueChanged.connect(self._request_auto_update)
         self.column_diameter_input.valueChanged.connect(self._request_auto_update)
         self.span_length_input.valueChanged.connect(self._request_auto_update)
@@ -450,8 +487,71 @@ class BridgeParametricWindow(QMainWindow):
                 self.status_label.setText("Ready")
                 self._last_hovered_ais = None
 
+    def _set_view_background(self, red: float, green: float, blue: float) -> None:
+        if not (hasattr(self.display, "View") and hasattr(self.display.View, "SetBackgroundColor")):
+            return
+
+        try:
+            try:
+                self.display.View.SetBackgroundColor(red, green, blue)
+            except TypeError:
+                bg_color = Quantity_Color(red, green, blue, Quantity_TOC_RGB)
+                self.display.View.SetBackgroundColor(bg_color)
+            self.display.Context.UpdateCurrentViewer()
+        except Exception:
+            pass
+
+    def _apply_theme(self) -> None:
+        if self._dark_mode:
+            self.panel.setStyleSheet(self._dark_panel_stylesheet)
+            self.theme_toggle_button.setText("Light Mode")
+            self.theme_toggle_button.setStyleSheet(
+                "background: rgba(17, 24, 39, 220);"
+                "color: #f9fafb;"
+                "border: 1px solid #6b7280;"
+                "border-radius: 6px;"
+                "padding: 5px 10px;"
+                "font-weight: 600;"
+            )
+            self.hover_tooltip.setStyleSheet(
+                "background-color: #0f172a;"
+                "color: #f8fafc;"
+                "padding: 6px;"
+                "border: 1px solid #475569;"
+                "border-radius: 4px;"
+                "font-size: 11px;"
+            )
+            self._set_view_background(0.12, 0.13, 0.16)
+        else:
+            self.panel.setStyleSheet(self._light_panel_stylesheet)
+            self.theme_toggle_button.setText("Dark Mode")
+            self.theme_toggle_button.setStyleSheet(
+                "background: rgba(255, 255, 255, 220);"
+                "color: #111827;"
+                "border: 1px solid #9ca3af;"
+                "border-radius: 6px;"
+                "padding: 5px 10px;"
+                "font-weight: 600;"
+            )
+            self.hover_tooltip.setStyleSheet(
+                "background-color: #222;"
+                "color: #fff;"
+                "padding: 6px;"
+                "border: 1px solid #555;"
+                "border-radius: 4px;"
+                "font-size: 11px;"
+            )
+            self._set_view_background(0.85, 0.85, 0.85)
+
+        self.theme_toggle_button.raise_()
+
+    def _toggle_dark_mode(self) -> None:
+        self._dark_mode = not self._dark_mode
+        self._apply_theme()
+
     def _initialize_scene(self) -> None:
         configure_display_scene(self.display)
+        self._apply_theme()
         self._on_update_model_clicked()
 
     def _set_inputs_from_params(self, params: Dict[str, Any]) -> None:
@@ -548,6 +648,7 @@ class BridgeParametricWindow(QMainWindow):
                 self.display.FitAll()
 
             self.display.Context.UpdateCurrentViewer()
+            self.theme_toggle_button.raise_()
             self.status_label.setText("Model updated")
         except Exception as exc:
             self.status_label.setText(f"Update failed: {exc}")
