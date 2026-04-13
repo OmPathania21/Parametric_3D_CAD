@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QDoubleSpinBox,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -143,27 +144,42 @@ class BridgeParametricWindow(QMainWindow):
 
         self.camera_toolbar = QWidget(self.viewer)
         self.camera_toolbar.setObjectName("cameraToolbar")
-        camera_toolbar_layout = QHBoxLayout(self.camera_toolbar)
+        camera_toolbar_layout = QGridLayout(self.camera_toolbar)
         camera_toolbar_layout.setContentsMargins(8, 8, 8, 8)
-        camera_toolbar_layout.setSpacing(6)
+        camera_toolbar_layout.setHorizontalSpacing(4)
+        camera_toolbar_layout.setVerticalSpacing(4)
 
         self.camera_top_button = QPushButton("Top", self.camera_toolbar)
+        self.camera_left_button = QPushButton("Left", self.camera_toolbar)
         self.camera_front_button = QPushButton("Front", self.camera_toolbar)
-        self.camera_side_button = QPushButton("Side", self.camera_toolbar)
+        self.camera_right_button = QPushButton("Right", self.camera_toolbar)
+        self.camera_back_button = QPushButton("Back", self.camera_toolbar)
+        self.camera_bottom_button = QPushButton("Bottom", self.camera_toolbar)
         self.camera_iso_button = QPushButton("Iso", self.camera_toolbar)
+
+        camera_toolbar_layout.addWidget(self.camera_top_button, 0, 1)
+        camera_toolbar_layout.addWidget(self.camera_left_button, 1, 0)
+        camera_toolbar_layout.addWidget(self.camera_front_button, 1, 1)
+        camera_toolbar_layout.addWidget(self.camera_right_button, 1, 2)
+        camera_toolbar_layout.addWidget(self.camera_back_button, 2, 1)
+        camera_toolbar_layout.addWidget(self.camera_bottom_button, 3, 1)
+        camera_toolbar_layout.addWidget(self.camera_iso_button, 2, 2)
 
         self._camera_buttons = (
             self.camera_top_button,
+            self.camera_left_button,
             self.camera_front_button,
-            self.camera_side_button,
+            self.camera_right_button,
+            self.camera_back_button,
+            self.camera_bottom_button,
             self.camera_iso_button,
         )
 
         for camera_button in self._camera_buttons:
             camera_button.setCursor(Qt.CursorShape.PointingHandCursor)
             camera_button.setCheckable(True)
-            camera_button.setMinimumHeight(28)
-            camera_toolbar_layout.addWidget(camera_button)
+            camera_button.setMinimumHeight(24)
+            camera_button.setMinimumWidth(52)
 
         self.camera_iso_button.setChecked(True)
 
@@ -541,8 +557,11 @@ class BridgeParametricWindow(QMainWindow):
         self.panel_toggle_button.toggled.connect(self._on_panel_toggle_toggled)
         self.theme_toggle_button.clicked.connect(self._toggle_dark_mode)
         self.camera_top_button.clicked.connect(lambda: self._set_camera_preset("top"))
+        self.camera_left_button.clicked.connect(lambda: self._set_camera_preset("left"))
         self.camera_front_button.clicked.connect(lambda: self._set_camera_preset("front"))
-        self.camera_side_button.clicked.connect(lambda: self._set_camera_preset("side"))
+        self.camera_right_button.clicked.connect(lambda: self._set_camera_preset("right"))
+        self.camera_back_button.clicked.connect(lambda: self._set_camera_preset("back"))
+        self.camera_bottom_button.clicked.connect(lambda: self._set_camera_preset("bottom"))
         self.camera_iso_button.clicked.connect(lambda: self._set_camera_preset("iso"))
         self.column_height_input.valueChanged.connect(self._request_auto_update)
         self.column_diameter_input.valueChanged.connect(self._request_auto_update)
@@ -717,8 +736,11 @@ class BridgeParametricWindow(QMainWindow):
     def _set_active_camera_chip(self, preset: str) -> None:
         preset_map = {
             "top": self.camera_top_button,
+            "left": self.camera_left_button,
             "front": self.camera_front_button,
-            "side": self.camera_side_button,
+            "right": self.camera_right_button,
+            "back": self.camera_back_button,
+            "bottom": self.camera_bottom_button,
             "iso": self.camera_iso_button,
         }
         active_button = preset_map.get(preset)
@@ -729,13 +751,24 @@ class BridgeParametricWindow(QMainWindow):
         try:
             if preset == "top" and hasattr(self.display, "View_Top"):
                 self.display.View_Top()
+            elif preset == "bottom" and hasattr(self.display, "View_Bottom"):
+                self.display.View_Bottom()
             elif preset == "front" and hasattr(self.display, "View_Front"):
                 self.display.View_Front()
-            elif preset == "side":
+            elif preset == "back":
+                if hasattr(self.display, "View_Rear"):
+                    self.display.View_Rear()
+                elif hasattr(self.display, "View_Back"):
+                    self.display.View_Back()
+            elif preset == "left" and hasattr(self.display, "View_Left"):
+                self.display.View_Left()
+            elif preset in ("right", "side"):
                 if hasattr(self.display, "View_Right"):
                     self.display.View_Right()
                 elif hasattr(self.display, "View_Left"):
                     self.display.View_Left()
+                if preset == "side":
+                    preset = "right"
             elif preset == "iso" and hasattr(self.display, "View_Iso"):
                 self.display.View_Iso()
 
@@ -866,9 +899,9 @@ class BridgeParametricWindow(QMainWindow):
                 "background: #1f2937;"
                 "color: #e5e7eb;"
                 "border: 1px solid #475569;"
-                "border-radius: 14px;"
-                "padding: 5px 11px;"
-                "font-size: 11px;"
+                "border-radius: 4px;"
+                "padding: 3px 6px;"
+                "font-size: 10px;"
                 "font-weight: 600;"
                 "}"
                 "#cameraToolbar QPushButton:hover { background: #334155; }"
@@ -937,9 +970,9 @@ class BridgeParametricWindow(QMainWindow):
                 "background: #ffffff;"
                 "color: #1f2937;"
                 "border: 1px solid #cbd5e1;"
-                "border-radius: 14px;"
-                "padding: 5px 11px;"
-                "font-size: 11px;"
+                "border-radius: 4px;"
+                "padding: 3px 6px;"
+                "font-size: 10px;"
                 "font-weight: 600;"
                 "}"
                 "#cameraToolbar QPushButton:hover { background: #f1f5f9; }"
